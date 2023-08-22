@@ -144,3 +144,57 @@ async def add_order(order: Order):
                         item,
                     ),
                 )
+    return {"id": created_id}
+
+
+@app.put("/orders/{order_id}")
+async def update_order(order: Order, order_id: int):
+    with psycopg.connect(
+        "dbname=test user=postgres password=password host=localhost",
+        autocommit=True,
+        row_factory=psycopg.rows.dict_row,
+    ) as db_conn:
+        with db_conn.cursor() as db_cur:
+            if (
+                db_cur.execute(
+                    "SELECT exists (SELECT 1 FROM orders WHERE id = %s LIMIT 1);",
+                    (order_id,),
+                ).fetchone()["exists"]
+                is False
+                or order_id <= 0
+            ):
+                raise fastapi.HTTPException(status_code=404, detail="Order not found")
+            db_cur.execute(
+                "UPDATE orders SET title = %s WHERE id = %s RETURNING (id)",
+                (
+                    order.title,
+                    order_id,
+                ),
+            )
+            updated_id = db_cur.fetchone()["id"]
+            db_cur.execute(
+                "DELETE FROM orders_items WHERE orders_id = %s;", (order_id,)
+            )
+            for item in order.items:
+                db_cur.execute(
+                    "INSERT INTO orders_items (orders_id, items_order_id) VALUES (%s, %s);",
+                    (
+                        order_id,
+                        item,
+                    ),
+                )
+    return {"id": updated_id}
+
+
+@app.delete("/orders/{order_id}")
+async def delete_order(order_id: int):
+    with psycopg.connect(
+        "dbname=test user=postgres password=password host=localhost",
+        autocommit=True,
+        row_factory=psycopg.rows.dict_row,
+    ) as db_conn:
+        with db_conn.cursor() as db_cur:
+            db_cur.execute("DELETE FROM orders_items WHERE orders_id = %s", (order_id,))
+            db_cur.execute("DELETE FROM orders WHERE id = %s", (order_id,))
+
+    return {"id": order_id}

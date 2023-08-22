@@ -3,6 +3,7 @@ from fastapi import FastAPI
 import psycopg
 import asyncio
 from pydantic import BaseModel
+from collections import Counter
 
 app = FastAPI()
 
@@ -53,6 +54,7 @@ async def on_startup():
                 """CREATE TABLE IF NOT EXISTS public.orders_items (
                 orders_id integer NOT NULL REFERENCES orders(id) ON UPDATE CASCADE ON DELETE CASCADE,
                 items_order_id integer NOT NULL REFERENCES items(id) ON UPDATE CASCADE ON DELETE CASCADE,
+                number integer NOT NULL DEFAULT 1,
                 CONSTRAINT orders_items_pkey PRIMARY KEY (orders_id, items_order_id));"""
             )
 
@@ -76,7 +78,8 @@ async def get_all_orders():
                 items = [list(i.values())[0] for i in items_data]
 
                 db_cur.execute(
-                    f"SELECT SUM(price) FROM items WHERE id IN {str(tuple(items))}"
+                    "SELECT SUM(price * number) FROM orders_items inner JOIN items ON items_order_id = id WHERE orders_id = %s",
+                    (order["id"],),
                 )
                 total_price = db_cur.fetchone()["sum"]
                 order["items"] = items
@@ -107,14 +110,14 @@ async def get_order_by_id(order_id: int):
                 db_cur.execute("SELECT * FROM orders WHERE id = %s;", (order_id,))
                 order_data = db_cur.fetchone()
                 db_cur.execute(
-                    "SELECT items_order_id FROM orders_items WHERE orders_id = %s",
+                    "select items_order_id AS id, number from items inner join orders_items on items.id = items_order_id where orders_id = %s",
                     (order_id,),
                 )
-                items_data = db_cur.fetchall()
-                items = [list(i.values())[0] for i in items_data]
+                items = db_cur.fetchall()
 
                 db_cur.execute(
-                    f"SELECT SUM(price) FROM items WHERE id IN {str(tuple(items))}"
+                    "SELECT SUM(price * number) FROM orders_items inner JOIN items ON items_order_id = id WHERE orders_id = %s",
+                    (order_id,),
                 )
                 total_price = db_cur.fetchone()["sum"]
                 order_data["items"] = items
@@ -136,12 +139,16 @@ async def add_order(order: Order):
                 (order.title,),
             )
             created_id = db_cur.fetchone()["id"]
-            for item in order.items:
+
+            counter = Counter(order.items)
+
+            for item in list(set(order.items)):
                 db_cur.execute(
-                    "INSERT INTO orders_items (orders_id, items_order_id) VALUES (%s, %s);",
+                    "INSERT INTO orders_items (orders_id, items_order_id, number) VALUES (%s, %s, %s);",
                     (
                         created_id,
                         item,
+                        counter[item],
                     ),
                 )
     return {"id": created_id}
@@ -175,12 +182,15 @@ async def update_order(order: Order, order_id: int):
             db_cur.execute(
                 "DELETE FROM orders_items WHERE orders_id = %s;", (order_id,)
             )
-            for item in order.items:
+            counter = Counter(order.items)
+
+            for item in list(set(order.items)):
                 db_cur.execute(
-                    "INSERT INTO orders_items (orders_id, items_order_id) VALUES (%s, %s);",
+                    "INSERT INTO orders_items (orders_id, items_order_id, number) VALUES (%s, %s, %s);",
                     (
-                        order_id,
+                        updated_id,
                         item,
+                        counter[item],
                     ),
                 )
     return {"id": updated_id}

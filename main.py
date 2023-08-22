@@ -2,8 +2,15 @@ import fastapi
 from fastapi import FastAPI
 import psycopg
 import asyncio
+from pydantic import BaseModel
 
 app = FastAPI()
+
+
+class Order(BaseModel):
+    id: int | None = None
+    title: str
+    items: list
 
 
 @app.on_event("startup")
@@ -15,20 +22,19 @@ async def on_startup():
         autocommit=True,
     ) as dbms_conn:
         with dbms_conn.cursor() as dbms_cur:
-            try:
-                dbms_cur.execute("CREATE DATABASE week5;")
-            except:
-                dbms_cur.execute("DROP DATABASE week5;")
+            pass
+            if (
+                dbms_cur.execute(
+                    "select exists(SELECT datname FROM pg_catalog.pg_database WHERE lower(datname) = lower('week5'));"
+                ).fetchone()[0]
+                is False
+            ):
                 dbms_cur.execute("CREATE DATABASE week5;")
 
     with psycopg.connect(
         "dbname=week5 user=postgres password=password host=localhost", autocommit=True
     ) as db_conn:
         with db_conn.cursor() as db_cur:
-            db_cur.execute("DROP TABLE IF EXISTS public.orders_items;")
-            db_cur.execute("DROP TABLE IF EXISTS public.items;")
-            db_cur.execute("DROP TABLE IF EXISTS public.orders;")
-
             db_cur.execute(
                 """CREATE TABLE IF NOT EXISTS public.items(
                 id serial PRIMARY KEY NOT NULL,
@@ -115,3 +121,26 @@ async def get_order_by_id(order_id: int):
                 order_data["total"] = total_price
                 pass
     return order_data
+
+
+@app.post("/orders")
+async def add_order(order: Order):
+    with psycopg.connect(
+        "dbname=test user=postgres password=password host=localhost",
+        autocommit=True,
+        row_factory=psycopg.rows.dict_row,
+    ) as db_conn:
+        with db_conn.cursor() as db_cur:
+            db_cur.execute(
+                "INSERT INTO orders (created_date, updated_date, title) VALUES (NOW(), NOW(), %s) RETURNING (id);",
+                (order.title,),
+            )
+            created_id = db_cur.fetchone()["id"]
+            for item in order.items:
+                db_cur.execute(
+                    "INSERT INTO orders_items (orders_id, items_order_id) VALUES (%s, %s);",
+                    (
+                        created_id,
+                        item,
+                    ),
+                )

@@ -5,7 +5,7 @@ router = APIRouter()
 
 
 @router.get("/orders")
-async def get_all_orders():
+async def get_all_orders() -> list:
     with get_db_cur() as db_cur:
         all_orders = db_cur.execute("SELECT * FROM orders;").fetchall()
 
@@ -16,7 +16,7 @@ async def get_all_orders():
 
 
 @router.get("/orders/{order_id}")
-async def get_order_by_id(order_id: int):
+async def get_order_by_id(order_id: int) -> dict:
     with get_db_cur() as db_cur:
         await check_for_order_in_db(db_cur, order_id)
         data = db_cur.execute(
@@ -28,7 +28,7 @@ async def get_order_by_id(order_id: int):
 
 
 @router.post("/orders")
-async def add_order(order: Order):
+async def add_order(order: Order) -> dict:
     with get_db_cur() as db_cur:
         created_id = db_cur.execute(
             "INSERT INTO orders (created_date, updated_date, title) VALUES (now(), now(), %s) RETURNING (id);",
@@ -42,10 +42,10 @@ async def add_order(order: Order):
 
 
 @router.put("/orders/{order_id}")
-async def update_order(order: Order, order_id: int):
+async def update_order(order: Order, order_id: int) -> dict:
     with get_db_cur() as db_cur:
         db_cur.execute(
-            "UPDATE orders SET title = %s WHERE id = %s RETURNING (id)",
+            "UPDATE orders SET title = %s, updated_date = NOW() WHERE id = %s RETURNING (id)",
             (
                 order.title,
                 order_id,
@@ -56,7 +56,7 @@ async def update_order(order: Order, order_id: int):
 
 
 @router.delete("/orders/{order_id}")
-async def delete_order(order_id: int):
+async def delete_order(order_id: int) -> dict:
     with get_db_cur() as db_cur:
         db_cur.execute("DELETE FROM orders_items WHERE order_id = %s", (order_id,))
         db_cur.execute("DELETE FROM orders WHERE id = %s", (order_id,))

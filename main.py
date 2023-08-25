@@ -1,10 +1,11 @@
 from fastapi import FastAPI, Depends
 from dependencies import *
-from routers import orders
+from routers import orders, items
 
 app = FastAPI()
 
 app.include_router(orders.router)
+app.include_router(items.router)
 
 
 @app.on_event("startup")

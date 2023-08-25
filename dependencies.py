@@ -1,8 +1,15 @@
 from fastapi import HTTPException
 import psycopg
 import asyncio
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 import contextlib
+
+
+class Item(BaseModel):
+    id: int | None = None
+    name: str
+    price: int
+    number: int = 1
 
 
 class Order(BaseModel):
@@ -52,9 +59,9 @@ def populate_database():
         )
 
 
-async def get_all_items(db_cur: psycopg.Cursor, order_id: int) -> dict:
+async def get_all_items(db_cur: psycopg.Cursor, order_id: int) -> list:
     return db_cur.execute(
-        "SELECT name, price, number FROM orders_items WHERE order_id = %s",
+        "SELECT id, name, price, number FROM orders_items WHERE order_id = %s",
         (order_id,),
     ).fetchall()
 
@@ -87,13 +94,18 @@ async def check_for_order_in_db(db_cur: psycopg.Cursor, order_id: int) -> None:
         return
 
 
-async def create_item_in_order(order_id, db_cur, item):
-    db_cur.execute(
-        "INSERT INTO orders_items (order_id, name, price, number) VALUES (%s, %s, %s, %s);",
+async def create_item_in_order(order_id, db_cur, item) -> int:
+    item = await dict_to_item_model(item)
+    return db_cur.execute(
+        "INSERT INTO orders_items (order_id, name, price, number) VALUES (%s, %s, %s, %s) RETURNING id;",
         (
             order_id,
-            item["name"],
-            item["price"],
-            item["number"],
+            item.name,
+            item.price,
+            item.number,
         ),
-    )
+    ).fetchone()["id"]
+
+
+async def dict_to_item_model(item_dict: dict) -> Item:
+    return Item.model_validate(item_dict)

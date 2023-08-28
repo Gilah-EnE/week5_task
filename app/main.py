@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends
-from dependencies import *
-from routers import orders, items
+from app.dependencies import *
+from app.routers import orders, items
 
 app = FastAPI()
 

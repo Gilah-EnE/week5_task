@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from dependencies import *
+from app.dependencies import *
 
 router = APIRouter(prefix="/orders/{order_id}")
 

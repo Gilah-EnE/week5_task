@@ -21,7 +21,7 @@ class Order(BaseModel):
 @contextlib.contextmanager
 def get_db_cur() -> psycopg.Cursor:
     with psycopg.connect(
-        "dbname=test user=postgres password=password host=localhost",
+        "dbname=week5 user=postgres password=supersecretpassword host=psql",
         autocommit=True,
         row_factory=psycopg.rows.dict_row,
     ).cursor() as db_cur:
@@ -30,7 +30,7 @@ def get_db_cur() -> psycopg.Cursor:
 
 def create_database_if_not_exists():
     with psycopg.connect(
-        "dbname=postgres user=postgres password=password host=localhost",
+        "dbname=postgres user=postgres password=supersecretpassword host=psql",
         autocommit=True,
     ).cursor() as dbms_cur:  # do not refactor, this connection is used only once to create the database
         if (

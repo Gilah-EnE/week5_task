@@ -6,6 +6,11 @@ router = APIRouter()
 
 @router.get("/orders")
 async def get_all_orders() -> list:
+    """
+    Endpoint, returns all orders
+    Returns:
+        all_orders: list of dicts with all orders and their details
+    """
     with get_db_cur() as db_cur:
         all_orders = db_cur.execute("SELECT * FROM orders;").fetchall()
 
@@ -17,6 +22,14 @@ async def get_all_orders() -> list:
 
 @router.get("/orders/{order_id}")
 async def get_order_by_id(order_id: int) -> dict:
+    """
+    Endpoint, returns order details by its ID
+    Args:
+        order_id: ID of order to get
+
+    Returns:
+        data: dict with order details
+    """
     with get_db_cur() as db_cur:
         await check_for_order_in_db(db_cur, order_id)
         data = db_cur.execute(
@@ -29,6 +42,14 @@ async def get_order_by_id(order_id: int) -> dict:
 
 @router.post("/orders")
 async def add_order(order: Order) -> dict:
+    """
+    Endpoint, creates new order with automatically generated ID
+    Args:
+        order: order details in Order class object format
+
+    Returns:
+        order: details of created order
+    """
     with get_db_cur() as db_cur:
         created_id = db_cur.execute(
             "INSERT INTO orders (created_date, updated_date, title) VALUES (now(), now(), %s) RETURNING (id);",
@@ -43,6 +64,15 @@ async def add_order(order: Order) -> dict:
 
 @router.put("/orders/{order_id}")
 async def update_order(order: Order, order_id: int) -> dict:
+    """
+    Endpoint, updates order details (title only, other parameters are immutable or edited from another endpoints)
+    Args:
+        order: order details in Order class object format
+        order_id: ID of order to update
+
+    Returns:
+        order: details of updated order
+    """
     with get_db_cur() as db_cur:
         db_cur.execute(
             "UPDATE orders SET title = %s, updated_date = NOW() WHERE id = %s RETURNING (id)",
@@ -57,6 +87,14 @@ async def update_order(order: Order, order_id: int) -> dict:
 
 @router.delete("/orders/{order_id}")
 async def delete_order(order_id: int) -> dict:
+    """
+    Endpoint, deletes order and its items by given ID.
+    Args:
+        order_id: ID of order to delete
+
+    Returns:
+        data: ID of deleted order
+    """
     with get_db_cur() as db_cur:
         db_cur.execute("DELETE FROM orders_items WHERE order_id = %s", (order_id,))
         db_cur.execute("DELETE FROM orders WHERE id = %s", (order_id,))
